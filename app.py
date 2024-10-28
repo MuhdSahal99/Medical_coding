@@ -7,77 +7,107 @@ class MedicalCodingAssistant:
     def __init__(self, api_key):
         self.client = Mistral(api_key=api_key)
         self.model = "mistral-large-latest"
-        
-    def create_medical_prompt(self, symptoms, conditions, events):
-        prompt = f"""
-        As a medical coding expert, analyze the following patient information and determine the underlying cause of death:
-        
-        Patient Conditions and Symptoms:
-        {', '.join(symptoms)}
-        
-        Existing Medical Conditions:
-        {', '.join(conditions)}
-        
-        Events Leading to Death:
-        {', '.join(events)}
-        
-        Please:
-        1. Identify the underlying root cause of death
-        2. Explain the causal chain leading to death
-        3. Suggest the most appropriate ICD-10 code for the underlying cause
-        4. Provide rationale for why this is the root cause rather than immediate cause
-        
-        Focus on identifying chronic conditions that initiated the chain of events leading to death.
-        """
-        return prompt
 
-    def analyze_cause_of_death(self, symptoms, conditions, events):
-        prompt = self.create_medical_prompt(symptoms, conditions, events)
-        
+    def analyze_medical_record(self, medical_record):
         try:
             chat_response = self.client.chat.complete(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a medical coding expert specializing in determining underlying causes of death and assigning appropriate ICD-10 codes."
+                        "content": """You are an expert medical coder with over 20 years of experience in clinical documentation 
+                        and ICD-10 coding. You have extensive knowledge in reviewing medical records across all specialties 
+                        including emergency medicine, internal medicine, surgery, obstetrics, and critical care.
+
+                        APPROACH EACH MEDICAL RECORD LIKE THIS:
+
+                        1. INITIAL ASSESSMENT:
+                           - Review complete record thoroughly
+                           - Identify department/setting (Emergency, Ward, ICU, etc.)
+                           - Note patient demographics and presentation
+                           - Understand timeline of events
+                           - Identify key clinical findings and interventions
+
+                        2. CLINICAL CONTEXT ANALYSIS:
+                           - Assess if this is an emergency/acute presentation or chronic condition
+                           - Look for pre-existing conditions and their relationship to death
+                           - Evaluate documented symptoms, signs, and test results
+                           - Consider the clinical progression and response to interventions
+                           - Check if death was witnessed or unwitnessed
+                           - Review any resuscitation attempts and their outcomes
+
+                        3. CAUSE OF DEATH DETERMINATION:
+                           Direct Cause:
+                           - What immediately led to death?
+                           - Is it clearly documented in the record?
+                           - Are there objective clinical findings supporting this?
+
+                           Intermediate Causes:
+                           - What conditions led to the direct cause?
+                           - Are there clear causal relationships?
+                           - Is the sequence clinically logical?
+
+                           Underlying Cause:
+                           - What started the chain of events?
+                           - Is it documented in the history?
+                           - Does it make clinical sense?
+
+                        4. TIME INTERVAL ASSESSMENT:
+                           - Use documented dates/times when available
+                           - Look for disease progression markers
+                           - Consider typical disease trajectories when exact times aren't given
+                           - Be honest about uncertainty - use "Unknown" if not clear
+
+                        5. SPECIAL CONSIDERATIONS:
+                           For Emergency Cases:
+                           - Note exact timings of events
+                           - Document interventions and responses
+                           - Consider pre-hospital events
+                           
+                           For Maternal Cases:
+                           - Check if female aged 15-49
+                           - Verify pregnancy status or recent delivery
+                           - Look for pregnancy-related complications
+                           - Exclude external causes
+
+                           For Chronic Conditions:
+                           - Evaluate disease progression
+                           - Note complications
+                           - Consider multiple organ involvement"""
                     },
                     {
                         "role": "user",
-                        "content": prompt
+                        "content": f"""Based on your expert analysis of this medical record, provide:
+
+                        CLINICAL SCENARIO:
+                        [Provide clear, concise summary of the case and key events]
+
+                        DEATH CERTIFICATION:
+                        Direct Cause of Death: [Diagnosis with ICD code]
+                        Time Interval: [Specify]
+
+                        First Intermediate Cause: [Diagnosis with ICD code if present]
+                        Time Interval: [Specify]
+
+                        Second Intermediate Cause: [Diagnosis with ICD code if present]
+                        Time Interval: [Specify]
+
+                        Underlying Cause: [Diagnosis with ICD code]
+                        Time Interval: [Specify]
+
+                        MATERNAL MORTALITY: [Yes/No/Not Applicable with clear reasoning]
+
+                        CLINICAL REASONING:
+                        [Explain your coding decisions, including why you chose these causes and sequence]
+
+                        Medical Record:
+                        {medical_record}"""
                     }
                 ]
             )
             return chat_response.choices[0].message.content
         except Exception as e:
-            return f"Error analyzing cause of death: {str(e)}"
-
-def extract_medical_info(text):
-    """Extract medical information from the text file."""
-    # Initialize lists to store extracted information
-    symptoms = []
-    conditions = []
-    events = []
-    
-    # Convert text to lowercase for easier matching
-    text_lower = text.lower()
-    
-    # Extract symptoms
-    if "presenting symptoms" in text_lower:
-        symptoms_section = text_lower.split("presenting symptoms")[1].split("\n\n")[0]
-        symptoms = [s.strip("- ").strip() for s in symptoms_section.split("\n") if s.strip("- ").strip()]
-    
-    # Extract conditions
-    if "medical history" in text_lower:
-        conditions_section = text_lower.split("medical history")[1].split("\n\n")[0]
-        conditions = [c.strip("- ").strip() for c in conditions_section.split("\n") if c.strip("- ").strip()]
-    
-    # Extract events
-    if "course of events" in text_lower:
-        events_section = text_lower.split("course of events")[1].split("\n\n")[0]
-        events = [e.strip("- ").strip() for e in events_section.split("\n") if e.strip("- ").strip() and not e.lower().startswith("march")]
-    
-    return symptoms, conditions, events
+            return f"Error analyzing medical record: {str(e)}"
 
 def display_typing_effect(text, result_placeholder):
     """Display text with typing effect."""
@@ -89,20 +119,27 @@ def display_typing_effect(text, result_placeholder):
     result_placeholder.markdown(full_text)
 
 def main():
-    st.set_page_config(page_title="Medical Record Analysis", page_icon="🏥", layout="wide")
+    st.set_page_config(page_title="Clinical Documentation Analysis", page_icon="🏥", layout="wide")
     
     st.title("Medical Record Analysis System")
-    st.write("Upload a medical record to analyze the underlying cause of death")
+    st.write("Professional Clinical Documentation and Coding Analysis")
     
     # Sidebar for API key
     with st.sidebar:
         st.header("Configuration")
-        api_key = st.text_input("Enter Key", type="password")
+        api_key = st.text_input("Enter Mistral API Key", type="password")
         st.markdown("""
+        ### System Capabilities:
+        - Comprehensive medical record analysis
+        - Accurate cause of death determination
+        - Precise ICD-10 coding
+        - Clinical reasoning documentation
+        - Special circumstance consideration
+        - Maternal mortality assessment
+        
         ### Instructions:
         1. Upload a medical record text file
-        2. Review the extracted information
-        3. Click analyze to get results
+        2. Click analyze for detailed results
         """)
     
     # File uploader
@@ -111,51 +148,28 @@ def main():
     if uploaded_file and api_key:
         # Read and display the original text
         text_content = uploaded_file.read().decode()
-        with st.expander("View Original Medical Record"):
+        
+        st.subheader("Medical Record")
+        with st.expander("View Medical Record", expanded=True):
             st.text(text_content)
         
-        # Extract information
-        symptoms, conditions, events = extract_medical_info(text_content)
-        
-        # Display extracted information in columns
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.subheader("Extracted Symptoms")
-            symptoms_edit = st.multiselect("Edit Symptoms", symptoms, default=symptoms)
-            
-        with col2:
-            st.subheader("Extracted Conditions")
-            conditions_edit = st.multiselect("Edit Conditions", conditions, default=conditions)
-            
-        with col3:
-            st.subheader("Extracted Events")
-            events_edit = st.multiselect("Edit Events", events, default=events)
-        
-        # Create a placeholder for results
-        result_container = st.empty()
-        
         # Analyze button
-        if st.button("Analyze Cause of Death"):
-            with st.spinner("Analyzing medical record..."):
+        if st.button("Analyze Medical Record"):
+            with st.spinner("Performing comprehensive clinical analysis..."):
                 try:
                     assistant = MedicalCodingAssistant(api_key)
-                    result = assistant.analyze_cause_of_death(
-                        symptoms=symptoms_edit,
-                        conditions=conditions_edit,
-                        events=events_edit
-                    )
+                    result = assistant.analyze_medical_record(text_content)
                     
                     # Display results with typing effect
-                    st.subheader("Analysis Results")
+                    st.subheader("Clinical Analysis Results")
                     result_placeholder = st.empty()
                     display_typing_effect(result, result_placeholder)
                     
                     # Add download button for the analysis
                     st.download_button(
-                        label="Download Analysis",
+                        label="Download Clinical Report",
                         data=result,
-                        file_name="medical_analysis_report.txt",
+                        file_name="clinical_analysis_report.txt",
                         mime="text/plain"
                     )
                 except Exception as e:
@@ -166,7 +180,16 @@ def main():
     
     # Footer
     st.markdown("---")
-    st.markdown("Medical Record Analysis System - For Healthcare Professionals Only")
+    st.markdown("""
+    **Clinical Documentation Analysis System - For Healthcare Professionals Only**
+    
+    This system provides expert-level analysis for:
+    - Emergency and non-emergency cases
+    - Chronic disease progression
+    - Acute medical events
+    - Maternal mortality cases
+    - Complex medical scenarios
+    """)
 
 if __name__ == "__main__":
     main()
